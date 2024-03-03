@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="RunOrderService8083" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="17" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <envs>
+      <env name="PETSTOREORDERSERVICE_SERVER_PORT" value="8083" />
+      <env name="PETSTOREPRODUCTSERVICE_URL" value="http://localhost:8082" />
+    </envs>
+    <module name="petstoreorderservice" />
+    <option name="MAIN_CLASS_NAME" value="io.swagger.Swagger2SpringBoot" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
