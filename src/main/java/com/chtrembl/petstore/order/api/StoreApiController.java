@@ -3,6 +3,7 @@ package com.chtrembl.petstore.order.api;
 import com.chtrembl.petstore.order.model.ContainerEnvironment;
 import com.chtrembl.petstore.order.model.Order;
 import com.chtrembl.petstore.order.model.Product;
+import com.chtrembl.petstore.order.model.SessionData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.annotations.ApiParam;
 import org.slf4j.Logger;
@@ -19,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
@@ -27,6 +30,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @javax.annotation.Generated(value = "io.swagger.codegen.languages.SpringCodegen", date = "2021-12-21T10:17:19.885-05:00")
 
@@ -164,7 +169,27 @@ public class StoreApiController implements StoreApi {
 			try {
 				Order order = this.storeApiCache.getOrder(body.getId());
 				String orderJSON = new ObjectMapper().writeValueAsString(order);
+				
+				SessionData sessionData = new SessionData();
+				sessionData.setSessionId(order.getId());
+				sessionData.setOrderJson(orderJSON);
+				
+				String azureFunctionUrl = "https://order-items-reserver-20240322140127089.azurewebsites.net/api/reserveOrderItems?";
 
+				// Invoke Azure function to save order info
+				WebClient
+					.create()
+					.post()
+					.uri(azureFunctionUrl)
+					.contentType(APPLICATION_JSON)
+					.body(Mono.just(sessionData), SessionData.class)
+					.retrieve()
+					.toBodilessEntity()
+					.subscribe(
+						result -> log.info("Order info saved successfully"),
+						error -> log.error("Error calling Azure function: " + error.getMessage())
+					);
+				
 				ApiUtil.setResponse(request, "application/json", orderJSON);
 				return new ResponseEntity<>(HttpStatus.OK);
 			} catch (IOException e) {
