@@ -17,7 +17,16 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
-
+  cloud:
+    azure:
+      cosmos:
+        database: OrderStorage
+  
+azure:
+  cosmosdb:
+    uri: https://orderstorageaccount.documents.azure.com:443/
+    key: ${PETSTORE_COSMOS_API_KEY}
+    database: OrderStorage
 management:
   endpoints:
     web:

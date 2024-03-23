@@ -4,6 +4,7 @@ import com.chtrembl.petstore.order.model.ContainerEnvironment;
 import com.chtrembl.petstore.order.model.Order;
 import com.chtrembl.petstore.order.model.Product;
 import com.chtrembl.petstore.order.model.SessionData;
+import com.chtrembl.petstore.order.repository.OrderRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.annotations.ApiParam;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ import javax.validation.constraints.Min;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -52,6 +54,9 @@ public class StoreApiController implements StoreApi {
 	@Autowired
 	private ContainerEnvironment containerEnvironment;
 
+	@Autowired
+	private OrderRepository orderRepository;
+	
 	@Autowired
 	private StoreApiCache storeApiCache;
 
@@ -119,19 +124,20 @@ public class StoreApiController implements StoreApi {
 					"PetStoreOrderService incoming POST request to petstoreorderservice/v2/order/placeOder for order id:%s",
 					body.getId()));
 
-			this.storeApiCache.getOrder(body.getId()).setId(body.getId());
-			this.storeApiCache.getOrder(body.getId()).setEmail(body.getEmail());
-			this.storeApiCache.getOrder(body.getId()).setComplete(body.isComplete());
+			Order order = this.orderRepository.findById(body.getId()).orElse(new Order());
+			order.setId(body.getId());
+			order.setEmail(body.getEmail());
+			order.setComplete(body.isComplete());
 
 			// 1 product is just an add from a product page so cache needs to be updated
 			if (body.getProducts() != null && body.getProducts().size() == 1) {
 				Product incomingProduct = body.getProducts().get(0);
-				List<Product> existingProducts = this.storeApiCache.getOrder(body.getId()).getProducts();
+				List<Product> existingProducts = order.getProducts();
 				if (existingProducts != null && existingProducts.size() > 0) {
 					// removal if one exists...
 					if (incomingProduct.getQuantity() == 0) {
 						existingProducts.removeIf(product -> product.getId().equals(incomingProduct.getId()));
-						this.storeApiCache.getOrder(body.getId()).setProducts(existingProducts);
+						order.setProducts(existingProducts);
 					}
 					// update quantity if one exists or add new entry
 					else {
@@ -150,24 +156,28 @@ public class StoreApiController implements StoreApi {
 							}
 						} else {
 							// existing products but one does not exist matching the incoming product
-							this.storeApiCache.getOrder(body.getId()).addProductsItem(body.getProducts().get(0));
+							if (order.getProducts() == null) {
+								order.setProducts(new ArrayList<>()); // create new list if not exist
+							}
+							order.getProducts().add(body.getProducts().get(0)); // add new product
 						}
 					}
 				} else {
 					// nothing existing....
 					if (body.getProducts().get(0).getQuantity() > 0) {
-						this.storeApiCache.getOrder(body.getId()).setProducts(body.getProducts());
+						order.setProducts(body.getProducts());
 					}
 				}
 			}
 			// n products is the current order being modified and so cache can be replaced
 			// with it
 			if (body.getProducts() != null && body.getProducts().size() > 1) {
-				this.storeApiCache.getOrder(body.getId()).setProducts(body.getProducts());
+				order.setProducts(body.getProducts());
 			}
 
 			try {
-				Order order = this.storeApiCache.getOrder(body.getId());
+				log.info("Saving order: " + order);
+				this.orderRepository.save(order);
 				String orderJSON = new ObjectMapper().writeValueAsString(order);
 				
 				SessionData sessionData = new SessionData();
@@ -218,13 +228,13 @@ public class StoreApiController implements StoreApi {
 
 			List<Product> products = this.storeApiCache.getProducts();
 
-			Order order = this.storeApiCache.getOrder(orderId);
+			Order order = orderRepository.findById(orderId).orElse(null);
 
 			if (products != null) {
 				// cross reference order data (order only has product id and qty) with product
 				// data....
 				try {
-					if (order.getProducts() != null) {
+					if (order != null && order.getProducts() != null) {
 						for (Product p : order.getProducts()) {
 							Product peekedProduct = getProduct(products, p.getId());
 							p.setName(peekedProduct.getName());
