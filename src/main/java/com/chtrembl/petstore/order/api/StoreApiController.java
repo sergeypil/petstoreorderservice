@@ -1,5 +1,8 @@
 package com.chtrembl.petstore.order.api;
 
+import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
 import com.chtrembl.petstore.order.model.ContainerEnvironment;
 import com.chtrembl.petstore.order.model.Order;
 import com.chtrembl.petstore.order.model.Product;
@@ -12,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.context.request.NativeWebRequest;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
@@ -33,8 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-
 @javax.annotation.Generated(value = "io.swagger.codegen.languages.SpringCodegen", date = "2021-12-21T10:17:19.885-05:00")
 
 @Controller
@@ -42,6 +42,9 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 public class StoreApiController implements StoreApi {
 
 	static final Logger log = LoggerFactory.getLogger(StoreApiController.class);
+	
+	@Value("PETSTORE_QUEUE_CONNECTION_STRING")
+	private String PETSTORE_QUEUE_CONNECTION_STRING;
 
 	private final ObjectMapper objectMapper;
 
@@ -184,21 +187,35 @@ public class StoreApiController implements StoreApi {
 				sessionData.setSessionId(order.getId());
 				sessionData.setOrderJson(orderJSON);
 				
-				String azureFunctionUrl = "https://order-items-reserver-20240322140127089.azurewebsites.net/api/reserveOrderItems?";
+//				String azureFunctionUrl = "https://order-items-reserver-20240322140127089.azurewebsites.net/api/reserveOrderItems?";
+//
+//				// Invoke Azure function to save order info
+//				WebClient
+//					.create()
+//					.post()
+//					.uri(azureFunctionUrl)
+//					.contentType(APPLICATION_JSON)
+//					.body(Mono.just(sessionData), SessionData.class)
+//					.retrieve()
+//					.toBodilessEntity()
+//					.subscribe(
+//						result -> log.info("Order info saved successfully"),
+//						error -> log.error("Error calling Azure function: " + error.getMessage())
+//					);
 
-				// Invoke Azure function to save order info
-				WebClient
-					.create()
-					.post()
-					.uri(azureFunctionUrl)
-					.contentType(APPLICATION_JSON)
-					.body(Mono.just(sessionData), SessionData.class)
-					.retrieve()
-					.toBodilessEntity()
-					.subscribe(
-						result -> log.info("Order info saved successfully"),
-						error -> log.error("Error calling Azure function: " + error.getMessage())
-					);
+				// Create a Service Bus Sender client for the queue
+				ServiceBusSenderClient senderClient = new ServiceBusClientBuilder()
+					.connectionString(PETSTORE_QUEUE_CONNECTION_STRING)
+					.sender()
+					.queueName("PetStoreQueue")
+					.buildClient();
+				
+				ServiceBusMessage message = new ServiceBusMessage(objectMapper.writeValueAsString(sessionData));
+				senderClient.sendMessage(message);
+
+				log.info("Order info posted to Service Bus successfully");
+				
+				senderClient.close();
 				
 				ApiUtil.setResponse(request, "application/json", orderJSON);
 				return new ResponseEntity<>(HttpStatus.OK);
