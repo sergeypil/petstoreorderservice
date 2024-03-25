@@ -207,7 +207,7 @@ public class StoreApiController implements StoreApi {
 				ServiceBusSenderClient senderClient = new ServiceBusClientBuilder()
 					.connectionString(PETSTORE_QUEUE_CONNECTION_STRING)
 					.sender()
-					.queueName("PetStoreQueue")
+					.queueName("petstorequeue")
 					.buildClient();
 				
 				ServiceBusMessage message = new ServiceBusMessage(objectMapper.writeValueAsString(sessionData));
