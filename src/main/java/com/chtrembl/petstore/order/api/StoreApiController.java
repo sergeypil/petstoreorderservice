@@ -43,7 +43,7 @@ public class StoreApiController implements StoreApi {
 
 	static final Logger log = LoggerFactory.getLogger(StoreApiController.class);
 	
-	@Value("PETSTORE_QUEUE_CONNECTION_STRING")
+	@Value("${PETSTORE_QUEUE_CONNECTION_STRING}")
 	private String PETSTORE_QUEUE_CONNECTION_STRING;
 
 	private final ObjectMapper objectMapper;
