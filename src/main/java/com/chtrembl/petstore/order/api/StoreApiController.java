@@ -244,8 +244,10 @@ public class StoreApiController implements StoreApi {
 					orderId));
 
 			List<Product> products = this.storeApiCache.getProducts();
-
+			log.info("Products from cache: " + products);
+			
 			Order order = orderRepository.findById(orderId).orElse(null);
+			log.info("Order from repository: " + order);
 
 			if (products != null) {
 				// cross reference order data (order only has product id and qty) with product
@@ -254,13 +256,14 @@ public class StoreApiController implements StoreApi {
 					if (order != null && order.getProducts() != null) {
 						for (Product p : order.getProducts()) {
 							Product peekedProduct = getProduct(products, p.getId());
+							log.info("Product from cache: " + peekedProduct);
 							p.setName(peekedProduct.getName());
 							p.setPhotoURL((peekedProduct.getPhotoURL()));
 						}
 					}
 				} catch (Exception e) {
 					log.error(String.format(
-							"PetStoreOrderService incoming GET request to petstoreorderservice/v2/order/getOrderById for order id:%s failed: %s",
+							"PetStoreOrderService incoming GET request to petstoreorderservice/v2/order/getOrderById for order failed id:%s, %s",
 							orderId, e.getMessage()));
 				}
 			}
